@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Secondary: Background Status and WS
     try {
+        initMobileMenu();
         if (state.activeProfile) {
             refreshStatus();
             loadSettings();
@@ -355,4 +356,25 @@ async function loadSettings() {
         document.getElementById('setting-initial-script').value = s.initial_script || '';
         document.getElementById('setting-system-prompt').value = s.system_prompt || '';
     }
+}
+
+function initMobileMenu() {
+    const btn = document.getElementById('btn-menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    const toggle = () => {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    };
+
+    btn.onclick = toggle;
+    overlay.onclick = toggle;
+
+    // Fecha ao clicar em link (mobile)
+    document.querySelectorAll('.nav-links li').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 992) toggle();
+        });
+    });
 }
