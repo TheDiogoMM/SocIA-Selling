@@ -12,9 +12,11 @@ let socket = null;
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     updateProfileSelector();
-    if (state.activeProfile) refreshStatus();
+    if (state.activeProfile) {
+        refreshStatus();
+        loadSettings();
+    }
     initWebSocket();
-    initSettings();
     initEventListeners();
 });
 
