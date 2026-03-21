@@ -10,14 +10,21 @@ let socket = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Priority: Event Listeners
+    initEventListeners();
     initNavigation();
     updateProfileSelector();
-    if (state.activeProfile) {
-        refreshStatus();
-        loadSettings();
+    
+    // Secondary: Background Status and WS
+    try {
+        if (state.activeProfile) {
+            refreshStatus();
+            loadSettings();
+        }
+        initWebSocket();
+    } catch (e) {
+        console.error("Erro na inicialização secundária:", e);
     }
-    initWebSocket();
-    initEventListeners();
 });
 
 // Navigation
