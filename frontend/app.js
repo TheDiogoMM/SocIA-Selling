@@ -77,9 +77,25 @@ async function apiCall(endpoint, method = 'GET', body = null) {
     if (body) opts.body = JSON.stringify(body);
     try {
         const res = await fetch(`/api/${endpoint}`, opts);
-        return await res.json();
+        
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorData;
+            try { errorData = JSON.parse(errorText); } catch(e) {}
+            const msg = errorData?.error || errorData?.detail || `Erro HTTP ${res.status}: ${errorText.substring(0, 50)}...`;
+            showToast(msg, 'danger');
+            return null;
+        }
+
+        try {
+            return await res.json();
+        } catch (e) {
+            const text = await res.text();
+            showToast(`Erro ao processar resposta: ${text.substring(0, 50)}`, 'danger');
+            return null;
+        }
     } catch (e) {
-        showToast(`Erro ${endpoint}: ${e.message}`, 'danger');
+        showToast(`Erro de conexão: ${e.message}`, 'danger');
         return null;
     }
 }

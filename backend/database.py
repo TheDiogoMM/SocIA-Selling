@@ -19,6 +19,8 @@ KEY: str = os.getenv("SUPABASE_ANON_KEY")
 REST_URL = f"{URL}/rest/v1"
 
 def get_client() -> AsyncPostgrestClient:
+    if not URL or not KEY:
+        raise ValueError("Configuração do Supabase ausente. Verifique as variáveis de ambiente no Vercel (SUPABASE_URL e SUPABASE_ANON_KEY).")
     return AsyncPostgrestClient(REST_URL, headers={"apikey": KEY, "Authorization": f"Bearer {KEY}"})
 
 # --- Settings ---
