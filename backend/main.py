@@ -99,9 +99,16 @@ async def get_status(username: str):
 
 @app.post("/api/login")
 async def login(payload: LoginPayload):
-    result = await ig.try_login(payload.username, payload.password)
-    await manager.broadcast({"event": "login_status", **result})
-    return result
+    try:
+        result = await ig.try_login(payload.username, payload.password)
+        try:
+            await manager.broadcast({"event": "login_status", **result})
+        except:
+            pass
+        return result
+    except Exception as e:
+        logger.error(f"Erro no login: {e}")
+        return {"ok": False, "error": f"Erro interno no servidor: {str(e)}"}
 
 @app.post("/api/logout")
 async def logout(payload: LoginPayload):
@@ -139,20 +146,24 @@ async def search_leads(payload: SearchPayload):
     if not cl: raise HTTPException(401, "Insta off")
 
     async def run_search():
-        loop = asyncio.get_event_loop()
-        leads = []
-        if payload.type == 'hashtag':
-            leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results))
-        elif payload.type == 'username':
-            user = await loop.run_in_executor(None, lambda: search_by_username(cl, payload.query))
-            if user: leads = [user]
-        elif payload.type == 'similar':
-            leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, payload.query, payload.max_results))
-        
-        count = 0
-        for l in leads:
-            if await db.upsert_lead(l, payload.profile): count += 1
-        await manager.broadcast({"event": "search_done", "profile": payload.profile, "new": count})
+        try:
+            loop = asyncio.get_event_loop()
+            leads = []
+            if payload.type == 'hashtag':
+                leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results))
+            elif payload.type == 'username':
+                user = await loop.run_in_executor(None, lambda: search_by_username(cl, payload.query))
+                if user: leads = [user]
+            elif payload.type == 'similar':
+                leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, payload.query, payload.max_results))
+            
+            count = 0
+            for l in leads:
+                if await db.upsert_lead(l, payload.profile): count += 1
+            await manager.broadcast({"event": "search_done", "profile": payload.profile, "new": count})
+        except Exception as e:
+            logger.error(f"Erro na busca: {e}")
+            await manager.broadcast({"event": "search_error", "profile": payload.profile, "error": str(e)})
 
     asyncio.create_task(run_search())
     return {"ok": True}

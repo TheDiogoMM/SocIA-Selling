@@ -263,25 +263,72 @@ document.getElementById('toggle-ai').onchange = async (e) => {
     await apiCall(`leads/ai-mode`, 'POST', { lead_id: state.currentLeadId, ai_mode: e.target.checked });
 };
 
-// WebSocket
+// WebSocket & Polling
 function initWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.event === 'search_done' && data.profile === state.activeProfile) {
-            showToast(`Busca concluída: ${data.new} novos leads.`);
-            loadLeads();
-            document.getElementById('search-progress').classList.add('hidden');
-        }
-        if (data.event === 'dm_sent' || data.event === 'reply_received') {
-            if (state.currentLeadId === data.lead_id) loadLeadDetails(data.lead_id);
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+        
+        socket.onopen = () => {
+            console.log("WebSocket conectado.");
+            document.getElementById('connection-status').className = 'dot online';
+            document.getElementById('connection-text').innerText = 'Conectado (Live)';
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleSocketMessage(data);
+            } catch (e) { console.error("Erro ao processar WS:", e); }
+        };
+
+        socket.onerror = () => {
+            console.warn("Falha no WebSocket. Ativando polling...");
+            startPolling();
+        };
+
+        socket.onclose = () => {
+            console.warn("WebSocket fechado. Ativando polling...");
+            startPolling();
+        };
+    } catch (e) {
+        console.error("Erro ao iniciar WebSocket:", e);
+        startPolling();
+    }
+}
+
+function handleSocketMessage(data) {
+    if (data.event === 'search_done' && data.profile === state.activeProfile) {
+        showToast(`Busca concluída: ${data.new} novos leads.`);
+        loadLeads();
+        document.getElementById('search-progress').classList.add('hidden');
+    }
+    if (data.event === 'dm_sent' || data.event === 'reply_received') {
+        if (state.currentLeadId === data.lead_id) loadLeadDetails(data.lead_id);
+        refreshStatus();
+    }
+    if (data.event === 'automation_started' || data.event === 'automation_stopped') {
+        if (data.profile === state.activeProfile) refreshStatus();
+    }
+}
+
+let pollingInterval = null;
+function startPolling() {
+    if (pollingInterval) return;
+    document.getElementById('connection-status').className = 'dot online';
+    document.getElementById('connection-text').innerText = 'Conectado (Polling)';
+    
+    pollingInterval = setInterval(() => {
+        if (state.activeProfile) {
             refreshStatus();
+            // Se estiver na aba de leads, recarrega a lista também
+            const activePage = document.querySelector('.page.active');
+            if (activePage && activePage.id === 'page-leads') {
+                loadLeads();
+                if (state.currentLeadId) loadLeadDetails(state.currentLeadId);
+            }
         }
-        if (data.event === 'automation_started' || data.event === 'automation_stopped') {
-            if (data.profile === state.activeProfile) refreshStatus();
-        }
-    };
+    }, 10000); // 10 segundos
 }
 
 // Utils

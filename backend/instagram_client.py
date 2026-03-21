@@ -26,6 +26,11 @@ async def try_login(username: str, password: str = None) -> dict:
     global _clients, _logged_in_users
     
     cl = Client()
+    # No Vercel, o sistema de arquivos é somente leitura, exceto /tmp
+    import os
+    if os.path.exists('/tmp'):
+        cl.settings_path = '/tmp/instagrapi_settings'
+    
     cl.delay_range = [2, 7]
     
     # 1. Tenta carregar sessão do Supabase
