@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+instagrapi
+google-generativeai
+python-dotenv
+supabase
+pypdf
+websockets
+httpx
+pydantic
+Pillow
+python-multipart

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SocIA Selling | Inteligência em Vendas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+    <div class="glass-bg"></div>
+    
+    <nav class="sidebar">
+        <div class="logo">
+            <span class="logo-icon">IA</span>
+            <span class="logo-text">SocIA Selling</span>
+        </div>
+        <ul class="nav-links">
+            <li class="active" data-page="dashboard"><i class="icon">📊</i> Dashboard</li>
+            <li data-page="leads"><i class="icon">👤</i> Leads</li>
+            <li data-page="settings"><i class="icon">⚙️</i> Configurações</li>
+        </ul>
+        <div class="profile-selector">
+            <label>Perfil Ativo</label>
+            <select id="active-profile-select">
+                <option value="">Nenhum</option>
+            </select>
+        </div>
+        <div class="status-indicator">
+            <div id="connection-status" class="dot offline"></div>
+            <span id="connection-text">Desconectado</span>
+        </div>
+    </nav>
+
+    <main class="content">
+        <!-- Login Overlay (if no profile) -->
+        <div id="login-overlay" class="login-overlay hidden">
+            <div class="card login-card">
+                <h2>Conectar Instagram</h2>
+                <p>Entre com qualquer perfil para iniciar a prospecção.</p>
+                <div class="input-group-vertical">
+                    <input type="text" id="login-username" placeholder="Usuário Instagram">
+                    <input type="password" id="login-password" placeholder="Senha">
+                    <button id="btn-do-login" class="btn primary">Conectar</button>
+                    <button id="btn-close-login" class="btn secondary">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Page -->
+        <section id="page-dashboard" class="page active">
+            <header class="page-header">
+                <h1>Painel de Controle</h1>
+                <div class="header-actions">
+                    <button id="btn-open-login" class="btn secondary">+ Novo Perfil</button>
+                    <button id="btn-start" class="btn success" disabled>Iniciar Automação</button>
+                    <button id="btn-stop" class="btn danger" disabled>Parar</button>
+                </div>
+            </header>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total de Leads</span>
+                    <span id="stat-total" class="stat-value">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Responderam</span>
+                    <span id="stat-respondeu" class="stat-value highlight">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Qualificados</span>
+                    <span id="stat-qualificado" class="stat-value success">0</span>
+                </div>
+            </div>
+
+            <div class="dashboard-main">
+                <div class="card search-card">
+                    <h3>🔍 Busca Avançada de Leads</h3>
+                    <div class="search-options">
+                        <select id="search-type">
+                            <option value="hashtag">Hashtag (#arquitetura)</option>
+                            <option value="username">Perfil Específico (@user)</option>
+                            <option value="similar">Perfis Semelhantes a (@user)</option>
+                        </select>
+                        <div class="input-group">
+                            <input type="text" id="search-query" placeholder="Sua busca aqui...">
+                            <button id="btn-search" class="btn primary">Buscar</button>
+                        </div>
+                    </div>
+                    <div id="search-progress" class="progress-container hidden">
+                        <div class="progress-bar"><div id="progress-fill" class="fill"></div></div>
+                        <span id="progress-text">Buscando...</span>
+                    </div>
+                </div>
+
+                <div class="card recent-activity">
+                    <h3>⚡ Atividade SocIA</h3>
+                    <div id="log-container" class="log-stream"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Leads Page -->
+        <section id="page-leads" class="page">
+            <header class="page-header">
+                <h1>Gerenciamento de Leads</h1>
+                <select id="filter-status">
+                    <option value="">Todos os Status</option>
+                    <option value="descoberto">Descoberto</option>
+                    <option value="contatado">Contatado</option>
+                    <option value="respondeu">Respondeu</option>
+                    <option value="qualificado">Qualificado</option>
+                </select>
+            </header>
+            
+            <div class="lead-view-container">
+                <div class="leads-table-wrapper card">
+                    <table id="leads-table">
+                        <thead>
+                            <tr>
+                                <th>Usuário</th>
+                                <th>Status</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-body"></tbody>
+                    </table>
+                </div>
+
+                <div id="dm-panel" class="dm-panel hidden">
+                    <div class="dm-header">
+                        <h4 id="dm-user-name">@user</h4>
+                        <div class="dm-ai-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-ai" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span>IA Ativa</span>
+                        </div>
+                    </div>
+                    <div id="dm-messages" class="dm-messages"></div>
+                    <div class="dm-input">
+                        <textarea id="dm-text" placeholder="Mensagem manual..."></textarea>
+                        <button id="btn-send-dm" class="btn primary">OK</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Page -->
+        <section id="page-settings" class="page">
+            <header class="page-header">
+                <h1>Configurações do Perfil</h1>
+                <button id="btn-save-settings" class="btn success">Salvar</button>
+            </header>
+            <div class="settings-grid">
+                <div class="card">
+                    <h3>📝 Script de Abordagem</h3>
+                    <textarea id="setting-initial-script" rows="4"></textarea>
+                    
+                    <h3 style="margin-top:1.5rem">📂 Base de Conhecimento (PDF/MD)</h3>
+                    <p class="subtitle">Adicione planos de script ou manuais de interação.</p>
+                    <div class="upload-area">
+                        <input type="file" id="kb-file-input" accept=".pdf,.md,.txt">
+                        <button id="btn-upload-kb" class="btn secondary">Enviar Arquivo</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>🤖 Instrução da IA (System Prompt)</h3>
+                    <textarea id="setting-system-prompt" rows="8"></textarea>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/static/app.js"></script>
+</body>
+</html>
