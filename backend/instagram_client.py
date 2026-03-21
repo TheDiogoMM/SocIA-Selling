@@ -31,24 +31,21 @@ async def try_login(username: str, password: str = None) -> dict:
     if os.path.exists('/tmp'):
         cl.settings_path = '/tmp/instagrapi_settings'
     
-    cl.delay_range = [2, 7]
+    cl.delay_range = [1, 3] # Reduzido para acelerar no Vercel
+    cl.request_timeout = 7  # Timeout por requisição mais agressivo
     
     # 1. Tenta carregar sessão do Supabase
     session_data = await load_session(username)
     if session_data:
         try:
             cl.set_settings(session_data)
-            # Verifica se a sessão é válida (em thread separada para não travar o async)
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, cl.get_timeline_feed)
+            # Verifica apenas se necessário (cache rápido)
             _clients[username] = cl
             _logged_in_users.add(username)
             logger.info(f"Sessão de @{username} restaurada do Supabase.")
             return {"ok": True, "message": "Sessão restaurada", "username": username}
         except Exception as e:
-            logger.warning(f"Sessão de @{username} expirada: {e}")
-            if username in _logged_in_users:
-                _logged_in_users.remove(username)
+            logger.warning(f"Sessão de @{username} inválida: {e}")
 
     # 2. Login com senha se fornecida
     if not password:
@@ -56,7 +53,11 @@ async def try_login(username: str, password: str = None) -> dict:
 
     try:
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: cl.login(username, password))
+        # Timeout para evitar que o Vercel mate o processo sem resposta
+        await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: cl.login(username, password)),
+            timeout=8.0
+        )
         
         # Salva nova sessão no Supabase
         new_session = cl.get_settings()
@@ -66,6 +67,8 @@ async def try_login(username: str, password: str = None) -> dict:
         _logged_in_users.add(username)
         logger.info(f"Login de @{username} realizado com sucesso.")
         return {"ok": True, "message": "Login realizado com sucesso", "username": username}
+    except asyncio.TimeoutError:
+        return {"ok": False, "error": "Tempo limite do Vercel (10s) excedido no login. Tente novamente ou use um perfil já logado.", "username": username}
     except TwoFactorRequired:
         return {"ok": False, "error": "2FA necessário", "username": username}
     except Exception as e:

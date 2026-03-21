@@ -42,6 +42,12 @@ manager = ConnectionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Validação de ambiente
+    import os
+    missing = [v for v in ["SUPABASE_URL", "SUPABASE_ANON_KEY", "GEMINI_API_KEY"] if not os.getenv(v)]
+    if missing:
+        logger.critical(f"VARIÁVEIS DE AMBIENTE AUSENTES: {', '.join(missing)}")
+    
     dm.set_broadcast(manager.broadcast)
     logger.info("SocIA Selling Online.")
     yield
