@@ -2,11 +2,17 @@
 main.py — Servidor FastAPI para SocIA Selling (Social AI Selling).
 Sessão Multi-Perfil e Integração Supabase.
 """
+import sys
+import os
 import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Ajuste para o Vercel encontrar módulos em /backend
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from typing import List, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
