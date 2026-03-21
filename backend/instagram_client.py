@@ -53,10 +53,10 @@ async def try_login(username: str, password: str = None) -> dict:
 
     try:
         loop = asyncio.get_event_loop()
-        # Timeout para evitar que o Vercel mate o processo sem resposta
+        # Timeout para evitar que o Vercel mate o processo sem resposta (Hobby = 10s)
         await asyncio.wait_for(
             loop.run_in_executor(None, lambda: cl.login(username, password)),
-            timeout=8.0
+            timeout=9.0
         )
         
         # Salva nova sessão no Supabase
