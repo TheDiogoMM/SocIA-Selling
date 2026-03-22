@@ -224,9 +224,11 @@ async def search_leads(payload: SearchPayload):
     is_vercel = os.getenv("VERCEL") or os.getenv("VERCEL_ENV")
     if payload.type == 'username' or is_vercel:
         try:
-            # No Vercel, limitamos a 10 resultados para não dar timeout (10s limit)
+            # No Vercel, o limite é 10 segundos para funções Hobby.
+            # Como cada similar/hashtag agora busca user_info individualmente (lento), 
+            # precisamos limitar bastante a quantidade no Vercel para não dar timeout.
             if is_vercel and payload.type != 'username':
-                payload.max_results = min(payload.max_results, 8)
+                payload.max_results = min(payload.max_results, 4) if payload.type == 'similar' else min(payload.max_results, 6)
             
             count = await run_search_logic()
             return {"ok": True, "count": count, "message": f"Busca concluída: {count} leads."}

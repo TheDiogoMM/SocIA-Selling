@@ -24,16 +24,17 @@ def _is_professional(user, custom_keywords: list[str] = None) -> bool:
     matched = [k.strip() for k in keywords if k.strip().lower() in bio or k.strip().lower() in full_name]
     has_keyword = len(matched) > 0
     
-    is_prof = has_keyword and user.follower_count >= 50 and not user.is_private
+    # Critérios: Palavra-chave OU Instagram diz que é similar
+    is_prof = (has_keyword or not custom_keywords) and user.follower_count >= 10 and not user.is_private
     
     if not is_prof:
         reason = []
-        if not has_keyword: reason.append("sem palavras-chave")
-        if user.follower_count < 50: reason.append(f"poucos seguidores ({user.follower_count})")
+        if not (has_keyword or not custom_keywords): reason.append("sem palavras-chave relevantes")
+        if user.follower_count < 10: reason.append(f"poucos seguidores ({user.follower_count})")
         if user.is_private: reason.append("perfil privado")
         logger.info(f"Filtro: @{user.username} rejeitado: {', '.join(reason)}")
     else:
-        logger.info(f"Filtro: @{user.username} ACEITO! (Match: {', '.join(matched)})")
+        logger.info(f"Filtro: @{user.username} ACEITO! (Match: {', '.join(matched) if matched else 'Similaridade Direta'})")
         
     return is_prof
 
@@ -82,13 +83,16 @@ def search_similar_accounts(cl: Client, username: str, max_results: int = 20, ke
         user_id = cl.user_id_from_username(clean_user)
         similar_users = cl.user_similar_accounts(user_id)
         
-        for user in similar_users[:max_results]:
+        for user in similar_users:
             try:
+                # OBTEM INFO COMPLETA (BIO, SEGUIDORES)
+                full_user = cl.user_info(user.pk)
+                
                 # Perfil profissional básico
-                if not _is_professional(user, keywords):
+                if not _is_professional(full_user, keywords):
                     continue
                 
-                formatted = _format_user(user)
+                formatted = _format_user(full_user)
                 
                 # Filtro de IA (Opcional)
                 if ai_context:
@@ -99,9 +103,15 @@ def search_similar_accounts(cl: Client, username: str, max_results: int = 20, ke
                         continue
                 
                 leads.append(formatted)
+                
+                # Pequeno delay
+                import time
+                time.sleep(random.uniform(1.0, 2.5))
+                
+                if len(leads) >= max_results: break
             except Exception as e:
                 logger.error(f"Erro ao processar similar @{user.username}: {e}")
-            except: continue
+                continue
     except Exception as e:
         logger.error(f"Erro perfis similares a @{username}: {e}")
     return leads
