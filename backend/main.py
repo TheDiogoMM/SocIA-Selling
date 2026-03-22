@@ -108,8 +108,11 @@ async def get_status(username: str):
     if not ig.is_logged_in(username):
         await ig.try_login(username)
     
+    # Tenta restaurar se não estiver em memória
+    cl = await ig.get_or_restore_client(username)
+    
     return {
-        "logged_in": ig.is_logged_in(username),
+        "logged_in": cl is not None,
         "is_searching": username in _active_searches,
         "automation_running": dm.is_running(username),
         "stats": await db.get_stats(username),
@@ -159,7 +162,7 @@ async def update_status(lead_id: str, payload: dict):
 
 @app.post("/api/leads/{lead_id}/dm")
 async def send_dm(lead_id: str, payload: ManualDMPayload):
-    cl = ig.get_client(payload.profile)
+    cl = await ig.get_or_restore_client(payload.profile)
     if not cl: raise HTTPException(401, "Insta off")
     ok = await dm.send_manual_dm(cl, lead_id, payload.text, payload.profile)
     return {"ok": ok}
@@ -171,8 +174,8 @@ async def set_ai_mode(payload: AIModePayload):
 
 @app.post("/api/search")
 async def search_leads(payload: SearchPayload):
-    cl = ig.get_client(payload.profile)
-    if not cl: raise HTTPException(401, "Insta off")
+    cl = await ig.get_or_restore_client(payload.profile)
+    if not cl: raise HTTPException(401, "Insta off - Re-autenticação necessária")
 
     async def run_search():
         _active_searches.add(payload.profile)
@@ -180,7 +183,10 @@ async def search_leads(payload: SearchPayload):
             loop = asyncio.get_event_loop()
             leads = []
             settings = await db.get_all_settings(payload.profile)
-            kws = settings.get("search_keywords", "").split(",") if settings.get("search_keywords") else None
+            kws_str = settings.get("search_keywords", "")
+            kws = [k.strip() for k in kws_str.split(",") if k.strip()] if kws_str else None
+            
+            logger.info(f"Iniciando busca para {payload.profile}. TIPO: {payload.type}, QUERY: {payload.query}, KWS: {kws}")
             
             if payload.type == 'hashtag':
                 leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results, kws))

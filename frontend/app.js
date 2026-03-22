@@ -214,14 +214,24 @@ function initEventListeners() {
     };
 
     document.getElementById('btn-search').onclick = async () => {
+        console.log("Botão de busca clicado.");
         if (!state.activeProfile) return showToast('Selecione um perfil primeiro', 'warning');
         const type = document.getElementById('search-type').value;
         const query = document.getElementById('search-query').value;
         if (!query) return showToast('Digite o termo de busca', 'warning');
 
+        showToast('Iniciando busca...', 'process');
         document.getElementById('search-progress').classList.remove('hidden');
-        document.getElementById('progress-fill').style.width = '0%';
-        await apiCall('search', 'POST', { profile: state.activeProfile, type, query, max_results: 15 });
+        document.getElementById('progress-fill').style.width = '30%';
+        
+        console.log(`Disparando busca: ${type} -> ${query} (Keywords: ${document.getElementById('setting-search-keywords').value})`);
+        const res = await apiCall('search', 'POST', { profile: state.activeProfile, type, query, max_results: 15 });
+        console.log("Resposta da busca:", res);
+        if (res && res.ok) {
+            // Acompanhar via WS ou Polling
+        } else {
+            document.getElementById('search-progress').classList.add('hidden');
+        }
     };
 
     document.getElementById('btn-start').onclick = async () => {

@@ -14,8 +14,17 @@ logger = logging.getLogger(__name__)
 _clients: dict[str, Client] = {}
 _logged_in_users: set[str] = set()
 
-def get_client(username: str) -> Client | None:
-    return _clients.get(username)
+async def get_or_restore_client(username: str) -> Client | None:
+    """Retorna o cliente da memória ou tenta restaurar do banco."""
+    global _clients, _logged_in_users
+    if username in _clients:
+        return _clients[username]
+    
+    # Tenta restaurar
+    res = await try_login(username)
+    if res.get("ok"):
+        return _clients.get(username)
+    return None
 
 def is_logged_in(username: str) -> bool:
     return username in _logged_in_users
