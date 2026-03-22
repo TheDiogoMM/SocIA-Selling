@@ -180,6 +180,9 @@ async def search_leads(payload: SearchPayload):
     async def run_search_logic():
         loop = asyncio.get_event_loop()
         leads = []
+        # Tenta sanitizar a query na lógica central
+        query = payload.query.strip().strip("@").strip("#")
+        
         settings = await db.get_all_settings(payload.profile)
         kws_str = settings.get("search_keywords", "")
         kws = [k.strip() for k in kws_str.split(",") if k.strip()] if kws_str else None
@@ -188,7 +191,10 @@ async def search_leads(payload: SearchPayload):
         
         try:
             if payload.type == 'hashtag':
-                leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results, kws))
+                # Remove # extras e espaços, limpa a lista de hashtags
+                tags = [t.strip().strip("#") for t in payload.query.split(',') if t.strip().strip("#")]
+                if not tags: return 0
+                leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, tags, payload.max_results, kws))
             elif payload.type == 'username':
                 user = await loop.run_in_executor(None, lambda: search_by_username(cl, payload.query))
                 if user: leads = [user]
@@ -234,10 +240,20 @@ async def search_leads(payload: SearchPayload):
 
 @app.post("/api/automation/start")
 async def start_auto(payload: AutomationPayload):
-    cl = ig.get_client(payload.profile)
-    if not cl: raise HTTPException(401, "Insta off")
-    ok = dm.start_automation(cl, payload.profile, payload.lead_ids)
-    return {"ok": ok}
+    try:
+        logger.info(f"Iniciando automação para {payload.profile} com {len(payload.lead_ids)} leads.")
+        cl = await ig.get_or_restore_client(payload.profile)
+        if not cl:
+            logger.warning(f"Falha ao obter cliente para {payload.profile}")
+            raise HTTPException(401, "Insta off - Re-autenticação necessária")
+        
+        ok = dm.start_automation(cl, payload.profile, payload.lead_ids)
+        return {"ok": ok}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Erro CRÍTICO em start_auto: {e}", exc_info=True)
+        return {"ok": False, "error": str(e)}
 
 @app.post("/api/automation/stop")
 async def stop_auto(payload: LoginPayload):

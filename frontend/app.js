@@ -384,6 +384,10 @@ function handleSocketMessage(data) {
         loadLeads();
         document.getElementById('search-progress').classList.add('hidden');
     }
+    if (data.event === 'search_error' && data.profile === state.activeProfile) {
+        showToast(`Erro na busca: ${data.error}`, 'error');
+        document.getElementById('search-progress').classList.add('hidden');
+    }
     if (data.event === 'dm_sent' || data.event === 'reply_received') {
         if (state.currentLeadId === data.lead_id) loadLeadDetails(data.lead_id);
         refreshStatus();

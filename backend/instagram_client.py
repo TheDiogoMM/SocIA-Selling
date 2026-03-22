@@ -15,15 +15,25 @@ _clients: dict[str, Client] = {}
 _logged_in_users: set[str] = set()
 
 async def get_or_restore_client(username: str) -> Client | None:
-    """Retorna o cliente da memória ou tenta restaurar do banco."""
+    """Retorna o cliente da memória ou tenta restaurar do banco com verificação."""
     global _clients, _logged_in_users
-    if username in _clients:
-        return _clients[username]
     
-    # Tenta restaurar
+    if username in _clients:
+        cl = _clients[username]
+        try:
+            # Verifica se ainda está válido (leve)
+            loop = asyncio.get_event_loop()
+            await asyncio.wait_for(loop.run_in_executor(None, lambda: cl.user_id_from_username(username)), timeout=4.0)
+            return cl
+        except:
+            logger.warning(f"Sessão em memória de @{username} parece inválida. Tentando restaurar...")
+            logout(username)
+    
+    # Tenta restaurar do banco
     res = await try_login(username)
     if res.get("ok"):
         return _clients.get(username)
+    
     return None
 
 def is_logged_in(username: str) -> bool:

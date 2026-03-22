@@ -36,9 +36,11 @@ def _is_professional(user, custom_keywords: list[str] = None) -> bool:
     return is_prof
 
 def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
+    """Busca leads por hashtag e filtra."""
     leads = []
+    logger.info(f"Instagrapi: Buscando hashtag #{hashtag.strip('#')}")
     try:
-        medias = cl.hashtag_medias_recent(hashtag.strip("#"), amount=max_results)
+        medias = cl.hashtag_medias_v1(hashtag.strip("#"), amount=max_results)
         seen_ids = set()
         for media in medias:
             if media.user.pk in seen_ids: continue
@@ -70,10 +72,12 @@ def search_by_username(cl: Client, username: str) -> dict | None:
         return None
 
 def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
-    """Busca perfis semelhantes a um usuário de sucesso."""
+    """Busca seguidores de contas semelhantes à fornecida."""
     leads = []
+    clean_user = username.strip().strip("@")
+    logger.info(f"Buscando contas semelhantes a @{clean_user}")
     try:
-        user_id = cl.user_id_from_username(username.strip("@"))
+        user_id = cl.user_id_from_username(clean_user)
         similar_users = cl.user_similar_accounts(user_id)
         for user in similar_users[:max_results]:
             try:
