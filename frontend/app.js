@@ -303,8 +303,13 @@ async function loadLeads() {
 }
 
 async function loadLeadDetails(id) {
+    console.log("Carregando detalhes do lead ID:", id);
     const lead = await apiCall(`leads/${id}`);
-    if (!lead) return;
+    console.log("Resposta do servidor para lead:", lead);
+    if (!lead) {
+        console.error("Lead não retornado pelo servidor!");
+        return;
+    }
     state.currentLeadId = id;
     document.getElementById('dm-panel').classList.remove('hidden');
     document.getElementById('dm-user-name').innerText = `@${lead.username}`;

@@ -34,7 +34,7 @@ def _is_professional(user, custom_keywords: list[str] = None) -> bool:
         if user.is_private: reason.append("perfil privado")
         logger.info(f"Filtro: @{user.username} rejeitado: {', '.join(reason)}")
     else:
-        logger.info(f"Filtro: @{user.username} ACEITO! (Match: {', '.join(matched) if matched else 'Similaridade Direta'})")
+        logger.info(f"Filtro: @{user.username} ACEITO! (Seguidores: {user.follower_count}, Match: {', '.join(matched) if matched else 'Similaridade/Vazio'})")
         
     return is_prof
 
@@ -82,6 +82,7 @@ def search_similar_accounts(cl: Client, username: str, max_results: int = 20, ke
     try:
         user_id = cl.user_id_from_username(clean_user)
         similar_users = cl.user_similar_accounts(user_id)
+        logger.info(f"Instagram retornou {len(similar_users)} contas semelhantes para @{clean_user}")
         
         for user in similar_users:
             try:

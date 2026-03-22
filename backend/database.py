@@ -5,11 +5,13 @@ Utiliza postgrest-py diretamente para evitar conflitos de dependências.
 import os
 import json
 import asyncio
+import logging
 from datetime import datetime
 from postgrest import AsyncPostgrestClient
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 # Configuração do Supabase
 URL: str = os.getenv("SUPABASE_URL")
@@ -101,9 +103,17 @@ async def load_session(profile: str) -> dict | None:
 
 async def upsert_lead(data: dict, owner: str) -> str:
     data["owner_profile"] = owner
-    async with get_client() as client:
-        res = await client.table("leads").upsert(data, on_conflict="instagram_id").execute()
-        return res.data[0]["id"] if res.data else None
+    try:
+        async with get_client() as client:
+            res = await client.table("leads").upsert(data, on_conflict="instagram_id").execute()
+            if res.data:
+                return res.data[0]["id"]
+            else:
+                logger.warning(f"Upsert de lead não retornou dados. Res: {res}")
+                return None
+    except Exception as e:
+        logger.error(f"Erro ao fazer upsert do lead {data.get('username')}: {e}")
+        return None
 
 async def get_lead(lead_id: str) -> dict | None:
     async with get_client() as client:
@@ -138,8 +148,7 @@ async def add_message(lead_id: str, role: str, text: str):
         })
         
         await client.table("leads").update({
-            "raw_messages": messages,
-            "last_contacted_at": "now()"
+            "raw_messages": messages
         }).eq("id", lead_id).execute()
 
 async def update_summary(lead_id: str, summary: str):
