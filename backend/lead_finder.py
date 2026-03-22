@@ -57,11 +57,16 @@ def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20, keywords:
 def search_by_username(cl: Client, username: str) -> dict | None:
     """Busca um perfil específico pelo username."""
     try:
-        user_id = cl.user_id_from_username(username.strip("@"))
+        clean_user = username.strip().strip("@")
+        logger.info(f"Instagrapi: Buscando ID para @{clean_user}")
+        user_id = cl.user_id_from_username(clean_user)
+        logger.info(f"Instagrapi: ID encontrado: {user_id}. Buscando info completa...")
         user = cl.user_info(user_id)
-        return _format_user(user)
+        formatted = _format_user(user)
+        logger.info(f"Instagrapi: Perfil @{clean_user} encontrado e formatado.")
+        return formatted
     except Exception as e:
-        logger.error(f"Erro busca perfil @{username}: {e}")
+        logger.error(f"Instagrapi: Erro ao buscar @{username}: {e}")
         return None
 
 def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:

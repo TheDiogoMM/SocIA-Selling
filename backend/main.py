@@ -177,17 +177,16 @@ async def search_leads(payload: SearchPayload):
     cl = await ig.get_or_restore_client(payload.profile)
     if not cl: raise HTTPException(401, "Insta off - Re-autenticação necessária")
 
-    async def run_search():
-        _active_searches.add(payload.profile)
+    async def run_search_logic():
+        loop = asyncio.get_event_loop()
+        leads = []
+        settings = await db.get_all_settings(payload.profile)
+        kws_str = settings.get("search_keywords", "")
+        kws = [k.strip() for k in kws_str.split(",") if k.strip()] if kws_str else None
+        
+        logger.info(f"Iniciando busca para {payload.profile}. TIPO: {payload.type}, QUERY: {payload.query}")
+        
         try:
-            loop = asyncio.get_event_loop()
-            leads = []
-            settings = await db.get_all_settings(payload.profile)
-            kws_str = settings.get("search_keywords", "")
-            kws = [k.strip() for k in kws_str.split(",") if k.strip()] if kws_str else None
-            
-            logger.info(f"Iniciando busca para {payload.profile}. TIPO: {payload.type}, QUERY: {payload.query}, KWS: {kws}")
-            
             if payload.type == 'hashtag':
                 leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results, kws))
             elif payload.type == 'username':
@@ -196,22 +195,42 @@ async def search_leads(payload: SearchPayload):
             elif payload.type == 'similar':
                 leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, payload.query, payload.max_results, kws))
             
+            logger.info(f"Busca bruta retornou {len(leads)} leads.")
+            
             count = 0
             for l in leads:
                 try:
-                    if await db.upsert_lead(l, payload.profile): count += 1
-                except Exception as db_e:
-                    logger.error(f"Erro ao salvar lead @{l.get('username')}: {db_e}")
+                    if await db.upsert_lead(l, payload.profile):
+                        count += 1
+                except Exception as e:
+                    logger.error(f"Erro ao salvar lead {l.get('username')}: {e}")
             
+            return count
+        except Exception as e:
+            logger.error(f"Erro na lógica de busca: {e}")
+            raise e
+
+    # Se for busca de um perfil só, fazemos SÍNCRONO (via await) para funcionar no Vercel
+    if payload.type == 'username':
+        try:
+            count = await run_search_logic()
+            return {"ok": True, "count": count, "message": f"Busca concluída: {count} leads."}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # Para buscas longas (hashtag), usamos background task (melhor localmente)
+    async def background_search():
+        _active_searches.add(payload.profile)
+        try:
+            count = await run_search_logic()
             await manager.broadcast({"event": "search_done", "profile": payload.profile, "new": count})
         except Exception as e:
-            logger.error(f"Erro na busca: {e}")
             await manager.broadcast({"event": "search_error", "profile": payload.profile, "error": str(e)})
         finally:
             _active_searches.discard(payload.profile)
 
-    asyncio.create_task(run_search())
-    return {"ok": True}
+    asyncio.create_task(background_search())
+    return {"ok": True, "message": "Busca iniciada em segundo plano."}
 
 @app.post("/api/automation/start")
 async def start_auto(payload: AutomationPayload):

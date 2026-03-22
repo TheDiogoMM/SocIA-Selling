@@ -227,8 +227,17 @@ function initEventListeners() {
         console.log(`Disparando busca: ${type} -> ${query} (Keywords: ${document.getElementById('setting-search-keywords').value})`);
         const res = await apiCall('search', 'POST', { profile: state.activeProfile, type, query, max_results: 15 });
         console.log("Resposta da busca:", res);
+        
         if (res && res.ok) {
-            // Acompanhar via WS ou Polling
+            if (res.count !== undefined) {
+                // Busca síncrona (username) concluída
+                showToast(`Busca concluída: ${res.count} leads.`);
+                loadLeads();
+                document.getElementById('search-progress').classList.add('hidden');
+            } else {
+                // Busca em segundo plano iniciada (hashtag)
+                showToast('Busca em andamento...');
+            }
         } else {
             document.getElementById('search-progress').classList.add('hidden');
         }
