@@ -19,9 +19,21 @@ def _is_professional(user, custom_keywords: list[str] = None) -> bool:
     full_name = (user.full_name or "").lower()
     
     keywords = custom_keywords if custom_keywords else ARCH_KEYWORDS
-    has_keyword = any(k.strip().lower() in bio or k.strip().lower() in full_name for k in keywords)
+    matched = [k.strip() for k in keywords if k.strip().lower() in bio or k.strip().lower() in full_name]
+    has_keyword = len(matched) > 0
     
-    return has_keyword and user.follower_count >= 50 and not user.is_private
+    is_prof = has_keyword and user.follower_count >= 50 and not user.is_private
+    
+    if not is_prof:
+        reason = []
+        if not has_keyword: reason.append("sem palavras-chave")
+        if user.follower_count < 50: reason.append(f"poucos seguidores ({user.follower_count})")
+        if user.is_private: reason.append("perfil privado")
+        logger.info(f"Filtro: @{user.username} rejeitado: {', '.join(reason)}")
+    else:
+        logger.info(f"Filtro: @{user.username} ACEITO! (Match: {', '.join(matched)})")
+        
+    return is_prof
 
 def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
     leads = []

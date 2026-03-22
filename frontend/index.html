@@ -106,9 +106,13 @@
                 <div class="card search-card">
                     <h3>🔍 Busca Avançada de Leads</h3>
                     <div class="search-options">
+                        <select id="search-type">
+                            <option value="hashtag">Hashtag (#hashtag)</option>
+                            <option value="username">Perfil Específico (@user)</option>
+                            <option value="similar">Perfis Semelhantes a (@user)</option>
                         </select>
                         <div class="input-group">
-                            <input type="text" id="setting-search-keywords" placeholder="Palavras-chave (ex: arquitetura, design)" style="font-size: 0.8rem; height: 35px;">
+                            <input type="text" id="setting-search-keywords" placeholder="Palavras-chave p/ filtrar (arquitetura, fitness, etc)" style="font-size: 0.8rem; height: 35px;">
                         </div>
                         <div class="input-group">
                             <input type="text" id="search-query" placeholder="Hashtag ou @usuário...">
