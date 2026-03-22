@@ -224,15 +224,21 @@ async def save_settings(payload: SettingsPayload):
 
 @app.post("/api/upload")
 async def upload_file(profile: str = Form(...), file: UploadFile = File(...)):
-    content = await file.read()
-    text = ""
-    if file.filename.endswith(".pdf"):
-        text = extract_text_from_pdf(content)
-    elif file.filename.endswith(".md") or file.filename.endswith(".txt"):
-        text = extract_text_from_markdown(content)
-    
-    if text:
-        await db.set_setting(profile, "knowledge_base_text", text)
+    try:
+        content = await file.read()
+        text = ""
+        if file.filename.endswith(".pdf"):
+            text = extract_text_from_pdf(content)
+        elif file.filename.endswith(".md") or file.filename.endswith(".txt"):
+            text = extract_text_from_markdown(content)
+        
+        if text:
+            await db.set_setting(profile, "knowledge_base_text", text)
+            return {"ok": True, "filename": file.filename}
+        return {"ok": False, "error": "Não foi possível extrair texto do arquivo."}
+    except Exception as e:
+        logger.error(f"Erro no upload: {e}")
+        return {"ok": False, "error": str(e)}
         return {"ok": True, "filename": file.filename}
     return {"ok": False, "error": "Formato não suportado"}
 
