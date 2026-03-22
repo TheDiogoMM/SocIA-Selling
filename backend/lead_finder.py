@@ -13,6 +13,8 @@ ARCH_KEYWORDS = [
     "decoraç", "projeto", "interiores", "ateliê", "studio arq"
 ]
 
+from ai_handler import filter_profile_by_ai
+
 def _is_professional(user, custom_keywords: list[str] = None) -> bool:
     """Heurística para filtrar perfis profissionais."""
     bio = (user.biography or "").lower()
@@ -71,21 +73,34 @@ def search_by_username(cl: Client, username: str) -> dict | None:
         logger.error(f"Instagrapi: Erro ao buscar @{username}: {e}")
         return None
 
-def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
-    """Busca seguidores de contas semelhantes à fornecida."""
+def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None, ai_context: str = None) -> list[dict]:
+    """Busca seguidores de contas semelhantes à fornecida, com filtro opcional de IA."""
     leads = []
     clean_user = username.strip().strip("@")
     logger.info(f"Buscando contas semelhantes a @{clean_user}")
     try:
         user_id = cl.user_id_from_username(clean_user)
         similar_users = cl.user_similar_accounts(user_id)
+        
         for user in similar_users[:max_results]:
             try:
-                full_user = cl.user_info(user.pk)
-                if _is_professional(full_user, keywords):
-                    leads.append(_format_user(full_user))
-                import time
-                time.sleep(random.uniform(0.5, 1.5))
+                # Perfil profissional básico
+                if not _is_professional(user, keywords):
+                    continue
+                
+                formatted = _format_user(user)
+                
+                # Filtro de IA (Opcional)
+                if ai_context:
+                    import asyncio
+                    is_match = asyncio.run(filter_profile_by_ai(formatted, ai_context))
+                    if not is_match:
+                        logger.info(f"IA: Perfil @{user.username} rejeitado pelo contexto.")
+                        continue
+                
+                leads.append(formatted)
+            except Exception as e:
+                logger.error(f"Erro ao processar similar @{user.username}: {e}")
             except: continue
     except Exception as e:
         logger.error(f"Erro perfis similares a @{username}: {e}")

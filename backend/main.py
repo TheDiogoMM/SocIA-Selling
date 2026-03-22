@@ -187,19 +187,23 @@ async def search_leads(payload: SearchPayload):
         kws_str = settings.get("search_keywords", "")
         kws = [k.strip() for k in kws_str.split(",") if k.strip()] if kws_str else None
         
-        logger.info(f"Iniciando busca para {payload.profile}. TIPO: {payload.type}, QUERY: {payload.query}")
+        # Busca o plano ativo para servir de contexto para a IA
+        ai_context = await db.get_active_plan_text(payload.profile)
+        
+        logger.info(f"Iniciando busca para {payload.profile}. TIPO: {payload.type}, QUERY: {query}")
         
         try:
             if payload.type == 'hashtag':
                 # Remove # extras e espaços, limpa a lista de hashtags
-                tags = [t.strip().strip("#") for t in payload.query.split(',') if t.strip().strip("#")]
+                tags = [t.strip().strip("#") for t in query.split(',') if t.strip().strip("#")]
                 if not tags: return 0
                 leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, tags, payload.max_results, kws))
             elif payload.type == 'username':
-                user = await loop.run_in_executor(None, lambda: search_by_username(cl, payload.query))
+                user = await loop.run_in_executor(None, lambda: search_by_username(cl, query))
                 if user: leads = [user]
             elif payload.type == 'similar':
-                leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, payload.query, payload.max_results, kws))
+                # Passa o contexto da IA se houver um plano ativo
+                leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, query, payload.max_results, kws, ai_context))
             
             logger.info(f"Busca bruta retornou {len(leads)} leads.")
             
@@ -216,15 +220,20 @@ async def search_leads(payload: SearchPayload):
             logger.error(f"Erro na lógica de busca: {e}")
             raise e
 
-    # Se for busca de um perfil só, fazemos SÍNCRONO (via await) para funcionar no Vercel
-    if payload.type == 'username':
+    # No Vercel, evitamos background tasks para hashtag/similar pois elas morrem "infinitamente"
+    is_vercel = os.getenv("VERCEL") or os.getenv("VERCEL_ENV")
+    if payload.type == 'username' or is_vercel:
         try:
+            # No Vercel, limitamos a 10 resultados para não dar timeout (10s limit)
+            if is_vercel and payload.type != 'username':
+                payload.max_results = min(payload.max_results, 8)
+            
             count = await run_search_logic()
             return {"ok": True, "count": count, "message": f"Busca concluída: {count} leads."}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-    # Para buscas longas (hashtag), usamos background task (melhor localmente)
+    # Localmente: Hashtags/Similar rodam em background
     async def background_search():
         _active_searches.add(payload.profile)
         try:

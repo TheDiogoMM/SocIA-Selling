@@ -82,3 +82,29 @@ Resumo:"""
     except Exception as e:
         logger.error(f"Erro ao gerar resumo: {e}")
         return "Resumo indisponível."
+
+async def filter_profile_by_ai(profile_data: dict, search_context: str) -> bool:
+    """
+    Usa IA para decidir se um perfil é um bom lead baseado na Bio e contexto.
+    Retorna True se for relevante.
+    """
+    try:
+        prompt = f"""
+Analise o perfil do Instagram abaixo e decida se ele é um bom lead (cliente em potencial) para o seguinte contexto:
+CONTEXTO: {search_context}
+
+PERFIL:
+- Username: @{profile_data.get('username')}
+- Nome: {profile_data.get('full_name')}
+- Bio: {profile_data.get('bio')}
+- Seguidores: {profile_data.get('followers')}
+
+Responda APENAS com a palavra "SIM" ou "NÃO".
+CRITÉRIO: O perfil deve ser um profissional ou empresa que se encaixe no contexto acima.
+"""
+        response = await _model.generate_content_async(prompt)
+        result = response.text.strip().upper()
+        return "SIM" in result
+    except Exception as e:
+        logger.error(f"Erro ao filtrar perfil com IA: {e}")
+        return True # Em caso de erro, mantém o lead
