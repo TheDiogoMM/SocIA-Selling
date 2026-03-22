@@ -189,7 +189,11 @@ async def search_leads(payload: SearchPayload):
             
             count = 0
             for l in leads:
-                if await db.upsert_lead(l, payload.profile): count += 1
+                try:
+                    if await db.upsert_lead(l, payload.profile): count += 1
+                except Exception as db_e:
+                    logger.error(f"Erro ao salvar lead @{l.get('username')}: {db_e}")
+            
             await manager.broadcast({"event": "search_done", "profile": payload.profile, "new": count})
         except Exception as e:
             logger.error(f"Erro na busca: {e}")
