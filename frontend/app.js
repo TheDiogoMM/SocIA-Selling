@@ -117,15 +117,19 @@ async function refreshStatus() {
 }
 
 function updateUI() {
-    const igDot = document.getElementById('ig-login-dot');
-    const igText = document.getElementById('ig-login-text');
+    const igDot = document.getElementById('connection-status');
+    const igText = document.getElementById('connection-text');
     const btnStart = document.getElementById('btn-start');
     const btnStop = document.getElementById('btn-stop');
 
     if (state.status.logged_in) {
+        igDot.className = 'dot online';
+        igText.innerText = 'Conectado';
         btnStart.disabled = state.status.automation_running;
         btnStop.disabled = !state.status.automation_running;
     } else {
+        igDot.className = 'dot offline';
+        igText.innerText = 'Desconectado';
         btnStart.disabled = true;
         btnStop.disabled = true;
     }
@@ -231,18 +235,24 @@ function initEventListeners() {
         document.getElementById('progress-fill').style.width = '30%';
         
         console.log(`Disparando busca: ${type} -> ${query} (Keywords: ${document.getElementById('setting-search-keywords').value})`);
-        const res = await apiCall('search', 'POST', { profile: state.activeProfile, type, query, max_results: 15 });
+        const res = await apiCall('search', 'POST', { profile: state.activeProfile, type: type, query: query, max_results: 15 });
         console.log("Resposta da busca:", res);
         
+        if (res && res.stats) console.log("Estatísticas da Busca:", res.stats);
+
         if (res && res.ok) {
             if (res.count !== undefined) {
-                // Busca síncrona (username) concluída
-                showToast(`Busca concluída: ${res.count} leads.`);
+                // Busca síncrona (username ou vercel) concluída
+                let msg = `Busca concluída: ${res.count} leads.`;
+                if (res.stats && res.count === 0 && res.stats.total_vistos > 0) {
+                    msg = `Analisados: ${res.stats.total_vistos}. Nenhum aceito pelos filtros.`;
+                }
+                showToast(msg);
                 loadLeads();
                 document.getElementById('search-progress').classList.add('hidden');
             } else {
                 // Busca em segundo plano iniciada (hashtag)
-                showToast('Busca em andamento...');
+                showToast('Busca em andamento...', 'process');
             }
         } else {
             document.getElementById('search-progress').classList.add('hidden');
@@ -317,7 +327,10 @@ async function loadLeadDetails(id) {
         return;
     }
     state.currentLeadId = id;
-    document.getElementById('dm-panel').classList.remove('hidden');
+    const panel = document.getElementById('dm-panel');
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
     document.getElementById('dm-user-name').innerText = `@${lead.username}`;
     document.getElementById('toggle-ai').checked = lead.ai_mode;
 
@@ -391,7 +404,16 @@ function initWebSocket() {
 
 function handleSocketMessage(data) {
     if (data.event === 'search_done' && data.profile === state.activeProfile) {
-        showToast(`Busca concluída: ${data.new} novos leads.`);
+        if (data.stats) console.log("Estatísticas da Busca (WS):", data.stats);
+        
+        let msg = `Busca concluída: ${data.new} novos leads.`;
+        if (data.stats && data.new === 0 && data.stats.total_vistos > 0) {
+            msg = `Analisados: ${data.stats.total_vistos}. Nenhum aceito pelos filtros.`;
+            showToast(msg, 'warning');
+        } else {
+            showToast(msg, 'success');
+        }
+        
         loadLeads();
         document.getElementById('search-progress').classList.add('hidden');
     }

@@ -191,21 +191,21 @@ async def search_leads(payload: SearchPayload):
         ai_context = await db.get_active_plan_text(payload.profile)
         
         logger.info(f"Iniciando busca para {payload.profile}. TIPO: {payload.type}, QUERY: {query}")
-        
+        leads = []
+        stats = {"total_vistos": 0}
         try:
             if payload.type == 'hashtag':
-                # Remove # extras e espaços, limpa a lista de hashtags
                 tags = [t.strip().strip("#") for t in query.split(',') if t.strip().strip("#")]
-                if not tags: return 0
-                leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, tags, payload.max_results, kws))
+                if not tags: return 0, stats
+                leads, stats = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, tags, payload.max_results, kws))
             elif payload.type == 'username':
                 user = await loop.run_in_executor(None, lambda: search_by_username(cl, query))
                 if user: leads = [user]
+                stats = {"total_vistos": 1 if user else 0}
             elif payload.type == 'similar':
-                # Passa o contexto da IA se houver um plano ativo
-                leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, query, payload.max_results, kws, ai_context))
+                leads, stats = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, query, payload.max_results, kws, ai_context))
             
-            logger.info(f"Busca bruta retornou {len(leads)} leads.")
+            logger.info(f"Busca brutas retornou {len(leads)} leads. Stats: {stats}")
             
             count = 0
             for l in leads:
@@ -215,7 +215,7 @@ async def search_leads(payload: SearchPayload):
                 except Exception as e:
                     logger.error(f"Erro ao salvar lead {l.get('username')}: {e}")
             
-            return count
+            return count, stats
         except Exception as e:
             logger.error(f"Erro na lógica de busca: {e}")
             raise e
@@ -230,8 +230,8 @@ async def search_leads(payload: SearchPayload):
             if is_vercel and payload.type != 'username':
                 payload.max_results = min(payload.max_results, 4) if payload.type == 'similar' else min(payload.max_results, 6)
             
-            count = await run_search_logic()
-            return {"ok": True, "count": count, "message": f"Busca concluída: {count} leads."}
+            count, stats = await run_search_logic()
+            return {"ok": True, "count": count, "stats": stats, "message": f"Busca concluída: {count} leads."}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -239,8 +239,8 @@ async def search_leads(payload: SearchPayload):
     async def background_search():
         _active_searches.add(payload.profile)
         try:
-            count = await run_search_logic()
-            await manager.broadcast({"event": "search_done", "profile": payload.profile, "new": count})
+            count, stats = await run_search_logic()
+            await manager.broadcast({"event": "search_done", "profile": payload.profile, "new": count, "stats": stats})
         except Exception as e:
             await manager.broadcast({"event": "search_error", "profile": payload.profile, "error": str(e)})
         finally:

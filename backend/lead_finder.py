@@ -15,10 +15,11 @@ ARCH_KEYWORDS = [
 
 from ai_handler import filter_profile_by_ai
 
-def _is_professional(user, custom_keywords: list[str] = None) -> bool:
+def _is_professional(user, custom_keywords: list[str] = None) -> tuple[bool, str]:
     """Heurística para filtrar perfis profissionais."""
     bio = (user.biography or "").lower()
     full_name = (user.full_name or "").lower()
+    reason = "ok"
     
     keywords = custom_keywords if custom_keywords else ARCH_KEYWORDS
     matched = [k.strip() for k in keywords if k.strip().lower() in bio or k.strip().lower() in full_name]
@@ -28,36 +29,43 @@ def _is_professional(user, custom_keywords: list[str] = None) -> bool:
     is_prof = (has_keyword or not custom_keywords) and user.follower_count >= 10 and not user.is_private
     
     if not is_prof:
-        reason = []
-        if not (has_keyword or not custom_keywords): reason.append("sem palavras-chave relevantes")
-        if user.follower_count < 10: reason.append(f"poucos seguidores ({user.follower_count})")
-        if user.is_private: reason.append("perfil privado")
-        logger.info(f"Filtro: @{user.username} rejeitado: {', '.join(reason)}")
+        if user.is_private: reason = "privado"
+        elif user.follower_count < 10: reason = "seguidores"
+        elif not (has_keyword or not custom_keywords): reason = "palavras-chave"
+        logger.info(f"Filtro: @{user.username} rejeitado: {reason}")
     else:
         logger.info(f"Filtro: @{user.username} ACEITO! (Seguidores: {user.follower_count}, Match: {', '.join(matched) if matched else 'Similaridade/Vazio'})")
         
-    return is_prof
+    return is_prof, reason
 
-def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
+def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20, keywords: list[str] = None) -> tuple[list[dict], dict]:
     """Busca leads por hashtag e filtra."""
     leads = []
-    logger.info(f"Instagrapi: Buscando hashtag #{hashtag.strip('#')}")
+    stats = {"total_vistos": 0, "privado": 0, "seguidores": 0, "palavras-chave": 0, "ai_rejeitado": 0}
+    clean_tag = hashtag.strip("#")
+    logger.info(f"Instagrapi: Buscando hashtag #{clean_tag}")
     try:
-        medias = cl.hashtag_medias_v1(hashtag.strip("#"), amount=max_results)
+        medias = cl.hashtag_medias_v1(clean_tag, amount=max_results * 4) # Busca mais p/ filtrar
         seen_ids = set()
         for media in medias:
             if media.user.pk in seen_ids: continue
             seen_ids.add(media.user.pk)
+            stats["total_vistos"] += 1
             try:
                 user = cl.user_info(media.user.pk)
-                if _is_professional(user, keywords):
-                    leads.append(_format_user(user))
+                is_prof, reason = _is_professional(user, keywords)
+                if not is_prof:
+                    if reason in stats: stats[reason] += 1
+                    continue
+                
+                leads.append(_format_user(user))
                 import time
-                time.sleep(random.uniform(1, 2))
+                time.sleep(random.uniform(1.0, 2.5))
+                if len(leads) >= max_results: break
             except: continue
     except Exception as e:
         logger.error(f"Erro hashtag #{hashtag}: {e}")
-    return leads
+    return leads, stats
 
 def search_by_username(cl: Client, username: str) -> dict | None:
     """Busca um perfil específico pelo username."""
@@ -74,9 +82,10 @@ def search_by_username(cl: Client, username: str) -> dict | None:
         logger.error(f"Instagrapi: Erro ao buscar @{username}: {e}")
         return None
 
-def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None, ai_context: str = None) -> list[dict]:
+def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None, ai_context: str = None) -> tuple[list[dict], dict]:
     """Busca seguidores de contas semelhantes à fornecida, com filtro opcional de IA."""
     leads = []
+    stats = {"total_vistos": 0, "privado": 0, "seguidores": 0, "palavras-chave": 0, "ai_rejeitado": 0}
     clean_user = username.strip().strip("@")
     logger.info(f"Buscando contas semelhantes a @{clean_user}")
     try:
@@ -85,12 +94,15 @@ def search_similar_accounts(cl: Client, username: str, max_results: int = 20, ke
         logger.info(f"Instagram retornou {len(similar_users)} contas semelhantes para @{clean_user}")
         
         for user in similar_users:
+            stats["total_vistos"] += 1
             try:
                 # OBTEM INFO COMPLETA (BIO, SEGUIDORES)
                 full_user = cl.user_info(user.pk)
                 
                 # Perfil profissional básico
-                if not _is_professional(full_user, keywords):
+                is_prof, reason = _is_professional(full_user, keywords)
+                if not is_prof:
+                    if reason in stats: stats[reason] += 1
                     continue
                 
                 formatted = _format_user(full_user)
@@ -101,6 +113,7 @@ def search_similar_accounts(cl: Client, username: str, max_results: int = 20, ke
                     is_match = asyncio.run(filter_profile_by_ai(formatted, ai_context))
                     if not is_match:
                         logger.info(f"IA: Perfil @{user.username} rejeitado pelo contexto.")
+                        stats["ai_rejeitado"] += 1
                         continue
                 
                 leads.append(formatted)
@@ -115,19 +128,23 @@ def search_similar_accounts(cl: Client, username: str, max_results: int = 20, ke
                 continue
     except Exception as e:
         logger.error(f"Erro perfis similares a @{username}: {e}")
-    return leads
+    return leads, stats
 
-def search_by_multiple_hashtags(cl: Client, hashtags: list[str], max_per_hashtag: int = 10, keywords: list[str] = None) -> list[dict]:
+def search_by_multiple_hashtags(cl: Client, hashtags: list[str], max_per_hashtag: int = 10, keywords: list[str] = None) -> tuple[list[dict], dict]:
     """Busca leads em múltiplas hashtags, removendo duplicatas."""
     all_leads = []
     seen_ids = set()
+    global_stats = {"total_vistos": 0, "privado": 0, "seguidores": 0, "palavras-chave": 0, "ai_rejeitado": 0}
+    
     for hashtag in hashtags:
-        results = search_by_hashtag(cl, hashtag, max_per_hashtag, keywords)
+        results, stats = search_by_hashtag(cl, hashtag, max_per_hashtag, keywords)
+        for k in global_stats: global_stats[k] += stats.get(k, 0)
+        
         for lead in results:
             if lead["instagram_id"] not in seen_ids:
                 seen_ids.add(lead["instagram_id"])
                 all_leads.append(lead)
-    return all_leads
+    return all_leads, global_stats
 
 def _format_user(user) -> dict:
     return {

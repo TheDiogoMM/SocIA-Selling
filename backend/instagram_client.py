@@ -13,16 +13,23 @@ logger = logging.getLogger(__name__)
 # Dicionário global para manter clientes ativos por username
 _clients: dict[str, Client] = {}
 _logged_in_users: set[str] = set()
+_last_verified: dict[str, float] = {} # username -> timestamp
 
-async def verify_session(cl: Client) -> bool:
-    """Verifica se a sessão do cliente ainda é válida usando uma chamada privada real."""
+async def verify_session(cl: Client, username: str) -> bool:
+    """Verifica se a sessão do cliente ainda é válida com cache de 2 minutos."""
+    import time
+    now = time.time()
+    if username in _last_verified and (now - _last_verified[username]) < 120:
+        return True # Considera válido se verificado recentemente
+        
     try:
         loop = asyncio.get_event_loop()
-        # account_info() é uma chamada privada que falha rápido se a sessão estiver morta
         await loop.run_in_executor(None, lambda: cl.account_info())
+        _last_verified[username] = now
         return True
     except Exception as e:
-        logger.warning(f"Sessão invalidada na verificação: {e}")
+        logger.warning(f"Sessão de @{username} invalidada: {e}")
+        _last_verified.pop(username, None)
         return False
 
 async def get_or_restore_client(username: str) -> Client | None:
@@ -32,7 +39,7 @@ async def get_or_restore_client(username: str) -> Client | None:
     # 1. Tenta cliente em memória
     if username in _clients:
         cl = _clients[username]
-        if await verify_session(cl):
+        if await verify_session(cl, username):
             return cl
         else:
             logger.warning(f"Sessão em memória de @{username} expirou. Removendo...")
@@ -46,7 +53,7 @@ async def get_or_restore_client(username: str) -> Client | None:
         
         try:
             cl.set_settings(session_data)
-            if await verify_session(cl):
+            if await verify_session(cl, username):
                 logger.info(f"Sessão de @{username} restaurada e VERIFICADA com sucesso.")
                 _clients[username] = cl
                 _logged_in_users.add(username)
