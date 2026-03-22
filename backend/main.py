@@ -68,6 +68,10 @@ class LoginPayload(BaseModel):
     username: str
     password: Optional[str] = None
 
+class SessionIdPayload(BaseModel):
+    username: str
+    sessionid: str
+
 class ManualDMPayload(BaseModel):
     lead_id: str
     text: str
@@ -121,6 +125,17 @@ async def login(payload: LoginPayload):
     except Exception as e:
         logger.error(f"Erro no login: {e}")
         return {"ok": False, "error": f"Erro interno no servidor: {str(e)}"}
+
+@app.post("/api/login/sessionid")
+async def login_sessionid(payload: SessionIdPayload):
+    try:
+        result = await ig.try_login_by_sessionid(payload.username, payload.sessionid)
+        if result.get("ok"):
+            try: await manager.broadcast({"event": "login_status", **result})
+            except: pass
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 @app.post("/api/logout")
 async def logout(payload: LoginPayload):
@@ -223,3 +238,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True: await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)

@@ -156,6 +156,52 @@ function initEventListeners() {
         }
     };
 
+    // Alternar abas de Login
+    const tabPass = document.getElementById('tab-login-pass');
+    const tabSid = document.getElementById('tab-login-sid');
+    const sectionPass = document.getElementById('section-login-pass');
+    const sectionSid = document.getElementById('section-login-sid');
+
+    if (tabPass && tabSid) {
+        tabPass.onclick = () => {
+            tabPass.classList.add('active');
+            tabSid.classList.remove('active');
+            sectionPass.classList.remove('hidden');
+            sectionSid.classList.add('hidden');
+        };
+        tabSid.onclick = () => {
+            tabSid.classList.add('active');
+            tabPass.classList.remove('active');
+            sectionSid.classList.remove('hidden');
+            sectionPass.classList.add('hidden');
+        };
+    }
+
+    // Login via SessionID
+    document.getElementById('btn-do-login-sid').onclick = async () => {
+        const username = document.getElementById('login-sid-username').value;
+        const sessionid = document.getElementById('login-sid-value').value;
+        if (!username || !sessionid) return showToast('Preencha Usuário e SessionID', 'warning');
+
+        showToast('Conectando via SessionID...', 'process');
+        const res = await apiCall('login/sessionid', 'POST', { username, sessionid });
+        if (res && res.ok) {
+            const finalUsername = res.username || username;
+            if (!state.profiles.includes(finalUsername)) {
+                state.profiles.push(finalUsername);
+                localStorage.setItem('profiles', JSON.stringify(state.profiles));
+            }
+            state.activeProfile = finalUsername;
+            localStorage.setItem('activeProfile', finalUsername);
+            document.getElementById('login-overlay').classList.add('hidden');
+            updateProfileSelector();
+            refreshStatus();
+            showToast('Conectado via SessionID!');
+        } else {
+            showToast(`Erro SID: ${res?.error || 'Falha no login'}`, 'danger');
+        }
+    };
+
     document.getElementById('btn-search').onclick = async () => {
         if (!state.activeProfile) return showToast('Selecione um perfil primeiro', 'warning');
         const type = document.getElementById('search-type').value;

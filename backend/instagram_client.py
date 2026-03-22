@@ -3,6 +3,7 @@ instagram_client.py — Autenticação dinâmica e persistência via Supabase pa
 """
 import logging
 import asyncio
+import os
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired, TwoFactorRequired
 from database import save_session, load_session
@@ -26,8 +27,6 @@ async def try_login(username: str, password: str = None) -> dict:
     global _clients, _logged_in_users
     
     cl = Client()
-    # No Vercel, o sistema de arquivos é somente leitura, exceto /tmp
-    import os
     if os.path.exists('/tmp'):
         cl.settings_path = '/tmp/instagrapi_settings'
     
@@ -39,7 +38,6 @@ async def try_login(username: str, password: str = None) -> dict:
     if session_data:
         try:
             cl.set_settings(session_data)
-            # Verifica apenas se necessário (cache rápido)
             _clients[username] = cl
             _logged_in_users.add(username)
             logger.info(f"Sessão de @{username} restaurada do Supabase.")
@@ -68,11 +66,35 @@ async def try_login(username: str, password: str = None) -> dict:
         logger.info(f"Login de @{username} realizado com sucesso.")
         return {"ok": True, "message": "Login realizado com sucesso", "username": username}
     except asyncio.TimeoutError:
-        return {"ok": False, "error": "Tempo limite do Vercel (10s) excedido no login. Tente novamente ou use um perfil já logado.", "username": username}
+        return {"ok": False, "error": "Tempo limite do Vercel (10s) excedido no login.", "username": username}
     except TwoFactorRequired:
         return {"ok": False, "error": "2FA necessário", "username": username}
     except Exception as e:
         logger.error(f"Erro no login de @{username}: {e}")
+        return {"ok": False, "error": str(e), "username": username}
+
+async def try_login_by_sessionid(username: str, sessionid: str) -> dict:
+    """
+    Realiza login usando apenas o SessionID colado do navegador.
+    """
+    global _clients, _logged_in_users
+    cl = Client()
+    if os.path.exists('/tmp'):
+        cl.settings_path = '/tmp/instagrapi_settings'
+    
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: cl.login_by_sessionid(sessionid))
+        
+        actual_username = cl.username
+        new_session = cl.get_settings()
+        await save_session(actual_username, new_session)
+        
+        _clients[actual_username] = cl
+        _logged_in_users.add(actual_username)
+        return {"ok": True, "message": "Login por SessionID com sucesso", "username": actual_username}
+    except Exception as e:
+        logger.error(f"Erro no login por SessionID: {e}")
         return {"ok": False, "error": str(e), "username": username}
 
 def logout(username: str):

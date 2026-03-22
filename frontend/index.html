@@ -48,13 +48,31 @@
         <div id="login-overlay" class="login-overlay hidden">
             <div class="card login-card">
                 <h2>Conectar Instagram</h2>
-                <p>Entre com qualquer perfil para iniciar a prospecção.</p>
-                <div class="input-group-vertical">
-                    <input type="text" id="login-username" placeholder="Usuário Instagram">
-                    <input type="password" id="login-password" placeholder="Senha">
-                    <button id="btn-do-login" class="btn primary">Conectar</button>
-                    <button id="btn-close-login" class="btn secondary">Cancelar</button>
+                <div class="login-tabs">
+                    <button id="tab-login-pass" class="tab-btn active">Senha</button>
+                    <button id="tab-login-sid" class="tab-btn">Session ID</button>
                 </div>
+                
+                <div id="section-login-pass" class="login-section">
+                    <p class="subtitle">Login tradicional por usuário e senha.</p>
+                    <div class="input-group-vertical">
+                        <input type="text" id="login-username" placeholder="Usuário Instagram">
+                        <input type="password" id="login-password" placeholder="Senha">
+                        <button id="btn-do-login" class="btn primary">Conectar</button>
+                    </div>
+                </div>
+
+                <div id="section-login-sid" class="login-section hidden">
+                    <p class="subtitle">Use o SessionID se o login comum falhar.</p>
+                    <div class="input-group-vertical">
+                        <input type="text" id="login-sid-username" placeholder="Usuário Instagram">
+                        <input type="text" id="login-sid-value" placeholder="SessionID (do navegador)">
+                        <button id="btn-do-login-sid" class="btn success">Conectar via SID</button>
+                        <a href="https://github.com/adw0rd/instagrapi#login-by-sessionid" target="_blank" style="color:var(--primary);font-size:0.8rem;margin-top:0.5rem;text-align:center">Como achar o SessionID?</a>
+                    </div>
+                </div>
+
+                <button id="btn-close-login" class="btn secondary" style="width:100%; margin-top:1rem;">Cancelar</button>
             </div>
         </div>
 
