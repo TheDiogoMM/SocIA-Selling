@@ -127,6 +127,17 @@ function updateUI() {
     document.getElementById('stat-total').innerText = state.status.stats?.total || 0;
     document.getElementById('stat-respondeu').innerText = state.status.stats?.respondeu || 0;
     document.getElementById('stat-qualificado').innerText = state.status.stats?.qualificado || 0;
+
+    // Feedback de busca (Polling)
+    const searchProgress = document.getElementById('search-progress');
+    if (state.status.is_searching) {
+        searchProgress.classList.remove('hidden');
+        document.getElementById('progress-fill').style.width = '100%'; // Indeterminado
+    } else if (socket && socket.readyState === WebSocket.OPEN) {
+        // Se o WS estiver on, o evento search_done cuida de esconder
+    } else {
+        searchProgress.classList.add('hidden');
+    }
 }
 
 // Event Listeners

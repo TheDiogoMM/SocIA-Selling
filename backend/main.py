@@ -45,6 +45,7 @@ class ConnectionManager:
             except: pass
 
 manager = ConnectionManager()
+_active_searches: set[str] = set()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -109,6 +110,7 @@ async def get_status(username: str):
     
     return {
         "logged_in": ig.is_logged_in(username),
+        "is_searching": username in _active_searches,
         "automation_running": dm.is_running(username),
         "stats": await db.get_stats(username),
     }
@@ -173,6 +175,7 @@ async def search_leads(payload: SearchPayload):
     if not cl: raise HTTPException(401, "Insta off")
 
     async def run_search():
+        _active_searches.add(payload.profile)
         try:
             loop = asyncio.get_event_loop()
             leads = []
@@ -191,6 +194,8 @@ async def search_leads(payload: SearchPayload):
         except Exception as e:
             logger.error(f"Erro na busca: {e}")
             await manager.broadcast({"event": "search_error", "profile": payload.profile, "error": str(e)})
+        finally:
+            _active_searches.discard(payload.profile)
 
     asyncio.create_task(run_search())
     return {"ok": True}

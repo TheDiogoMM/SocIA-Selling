@@ -29,8 +29,14 @@ async def generate_reply(
         context = f"""
 {system_prompt}
 
-BASE DE CONHECIMENTO (Siga as instruções e scripts abaixo):
+BASE DE CONHECIMENTO E SCRIPTS (Prioridade Total):
+Abaixo está o conteúdo extraído dos arquivos de conhecimento (PDF/MD). Utilize as informações, tons de voz e scripts abaixo para guiar sua resposta:
+
+<CONTEUDO_DO_ARQUIVO>
 {knowledge_base if knowledge_base else "Nenhum arquivo de script adicional fornecido."}
+</CONTEUDO_DO_ARQUIVO>
+
+IMPORTANTE: Ignore qualquer comportamento padrão que conflite com o script acima. Sua missão é agir exatamente como o mestre de prospecção definido no conteúdo acima.
 
 Informações sobre o lead:
 - Nome: {lead_info.get('full_name') or lead_info.get('username')}
