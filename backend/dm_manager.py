@@ -82,7 +82,9 @@ async def handle_incoming_reply(cl: Client, lead_id: str, text: str, profile_use
         await asyncio.sleep(random.uniform(20, 60))
         settings = await get_all_settings(profile_username)
         system_prompt = settings.get("system_prompt", "")
-        kb_text = settings.get("knowledge_base_text", "")
+        # Busca o plano de script ATIVO
+        from database import get_active_plan_text
+        kb_text = await get_active_plan_text(profile_username)
         
         reply_text = await generate_reply(system_prompt, lead.get("raw_messages", []), lead, kb_text)
         if reply_text:

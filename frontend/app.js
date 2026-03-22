@@ -238,6 +238,7 @@ function initEventListeners() {
         const fileInput = document.getElementById('kb-file-input');
         if (!fileInput.files[0] || !state.activeProfile) return showToast('Selecione um arquivo', 'warning');
 
+        showToast('Enviando arquivo...', 'process');
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
         formData.append('profile', state.activeProfile);
@@ -245,18 +246,21 @@ function initEventListeners() {
         try {
             const res = await fetch('/api/upload', { method: 'POST', body: formData });
             const data = await res.json();
-            if (data.ok) showToast(`Arquivo ${data.filename} carregado!`);
-            else showToast(data.error, 'danger');
+            if (data.ok) {
+                showToast(`Arquivo ${data.filename} carregado!`);
+                loadPlans(); // Recarrega a lista
+            } else showToast(data.error, 'danger');
         } catch (e) { showToast(e.message, 'danger'); }
     };
 
     document.getElementById('btn-save-settings').onclick = async () => {
         const settings = {
             initial_script: document.getElementById('setting-initial-script').value,
-            system_prompt: document.getElementById('setting-system-prompt').value
+            system_prompt: document.getElementById('setting-system-prompt').value,
+            search_keywords: document.getElementById('setting-search-keywords').value
         };
         const res = await apiCall('settings', 'POST', { profile: state.activeProfile, settings });
-        if (res && res.ok) showToast('Salvo!');
+        if (res && res.ok) showToast('Configurações salvas!');
     };
 }
 
@@ -412,8 +416,53 @@ async function loadSettings() {
     if (s) {
         document.getElementById('setting-initial-script').value = s.initial_script || '';
         document.getElementById('setting-system-prompt').value = s.system_prompt || '';
+        document.getElementById('setting-search-keywords').value = s.search_keywords || '';
     }
+    loadPlans();
 }
+
+async function loadPlans() {
+    if (!state.activeProfile) return;
+    const plans = await apiCall(`plans?profile=${state.activeProfile}`);
+    const body = document.getElementById('plans-body');
+    if (!body) return;
+    body.innerHTML = '';
+
+    if (!plans || plans.length === 0) {
+        body.innerHTML = '<tr><td colspan="3" style="text-align:center; opacity:0.5">Nenhum plano carregado.</td></tr>';
+        return;
+    }
+
+    plans.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.name}</td>
+            <td>${p.is_active ? '<span class="plan-active-badge">ATIVO</span>' : '<span style="opacity:0.5">Inativo</span>'}</td>
+            <td>
+                ${!p.is_active ? `<button class="btn-sm activate" onclick="activatePlan('${p.id}')">Ativar</button>` : ''}
+                <button class="btn-sm delete" onclick="deletePlan('${p.id}')">Excluir</button>
+            </td>
+        `;
+        body.appendChild(tr);
+    });
+}
+
+window.activatePlan = async (id) => {
+    const res = await apiCall(`plans/${id}/activate?profile=${state.activeProfile}`, 'POST');
+    if (res?.ok) {
+        showToast('Plano ativado!');
+        loadPlans();
+    }
+};
+
+window.deletePlan = async (id) => {
+    if (!confirm('Excluir este plano?')) return;
+    const res = await apiCall(`plans/${id}`, 'DELETE');
+    if (res?.ok) {
+        showToast('Plano excluído!');
+        loadPlans();
+    }
+};
 
 function initMobileMenu() {
     const btn = document.getElementById('btn-menu-toggle');

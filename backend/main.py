@@ -179,13 +179,16 @@ async def search_leads(payload: SearchPayload):
         try:
             loop = asyncio.get_event_loop()
             leads = []
+            settings = await db.get_all_settings(payload.profile)
+            kws = settings.get("search_keywords", "").split(",") if settings.get("search_keywords") else None
+            
             if payload.type == 'hashtag':
-                leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results))
+                leads = await loop.run_in_executor(None, lambda: search_by_multiple_hashtags(cl, payload.query.split(','), payload.max_results, kws))
             elif payload.type == 'username':
                 user = await loop.run_in_executor(None, lambda: search_by_username(cl, payload.query))
                 if user: leads = [user]
             elif payload.type == 'similar':
-                leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, payload.query, payload.max_results))
+                leads = await loop.run_in_executor(None, lambda: search_similar_accounts(cl, payload.query, payload.max_results, kws))
             
             count = 0
             for l in leads:
@@ -237,14 +240,26 @@ async def upload_file(profile: str = Form(...), file: UploadFile = File(...)):
             text = extract_text_from_markdown(content)
         
         if text:
-            await db.set_setting(profile, "knowledge_base_text", text)
+            await db.add_plan(profile, file.filename, text)
             return {"ok": True, "filename": file.filename}
         return {"ok": False, "error": "Não foi possível extrair texto do arquivo."}
     except Exception as e:
         logger.error(f"Erro no upload: {e}")
         return {"ok": False, "error": str(e)}
-        return {"ok": True, "filename": file.filename}
-    return {"ok": False, "error": "Formato não suportado"}
+
+@app.get("/api/plans")
+async def get_plans(profile: str):
+    return await db.get_plans(profile)
+
+@app.post("/api/plans/{plan_id}/activate")
+async def activate_plan(profile: str, plan_id: str):
+    await db.activate_plan(profile, plan_id)
+    return {"ok": True}
+
+@app.delete("/api/plans/{plan_id}")
+async def delete_plan(plan_id: str):
+    await db.delete_plan(plan_id)
+    return {"ok": True}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

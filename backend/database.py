@@ -40,7 +40,46 @@ async def set_setting(profile: str, key: str, value: str):
 async def get_all_settings(profile: str) -> dict:
     async with get_client() as client:
         res = await client.table("settings").select("*").eq("profile_username", profile).execute()
-        return res.data[0] if res.data else {}
+        if res.data:
+            return res.data[0]
+        # Se não existir, cria vazio para evitar erros
+        await client.table("settings").insert({"profile_username": profile}).execute()
+        return {}
+
+# --- Knowledge Plans ---
+
+async def add_plan(profile: str, name: str, content: str):
+    async with get_client() as client:
+        # Se for o primeiro plano, marca como ativo
+        plans = await get_plans(profile)
+        is_active = len(plans) == 0
+        await client.table("knowledge_plans").insert({
+            "profile_username": profile,
+            "name": name,
+            "content": content,
+            "is_active": is_active
+        }).execute()
+
+async def get_plans(profile: str) -> list[dict]:
+    async with get_client() as client:
+        res = await client.table("knowledge_plans").select("*").eq("profile_username", profile).order("created_at", desc=True).execute()
+        return res.data
+
+async def delete_plan(plan_id: str):
+    async with get_client() as client:
+        await client.table("knowledge_plans").delete().eq("id", plan_id).execute()
+
+async def activate_plan(profile: str, plan_id: str):
+    async with get_client() as client:
+        # Desativa todos
+        await client.table("knowledge_plans").update({"is_active": False}).eq("profile_username", profile).execute()
+        # Ativa o selecionado
+        await client.table("knowledge_plans").update({"is_active": True}).eq("id", plan_id).execute()
+
+async def get_active_plan_text(profile: str) -> str:
+    async with get_client() as client:
+        res = await client.table("knowledge_plans").select("content").eq("profile_username", profile).eq("is_active", True).execute()
+        return res.data[0]["content"] if res.data else ""
 
 # --- Sessions (Cookies) ---
 

@@ -106,13 +106,12 @@
                 <div class="card search-card">
                     <h3>🔍 Busca Avançada de Leads</h3>
                     <div class="search-options">
-                        <select id="search-type">
-                            <option value="hashtag">Hashtag (#arquitetura)</option>
-                            <option value="username">Perfil Específico (@user)</option>
-                            <option value="similar">Perfis Semelhantes a (@user)</option>
                         </select>
                         <div class="input-group">
-                            <input type="text" id="search-query" placeholder="Sua busca aqui...">
+                            <input type="text" id="setting-search-keywords" placeholder="Palavras-chave (ex: arquitetura, design)" style="font-size: 0.8rem; height: 35px;">
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="search-query" placeholder="Hashtag ou @usuário...">
                             <button id="btn-search" class="btn primary">Buscar</button>
                         </div>
                     </div>
@@ -197,6 +196,22 @@
                 <div class="card">
                     <h3>🤖 Instrução da IA (System Prompt)</h3>
                     <textarea id="setting-system-prompt" rows="8"></textarea>
+                    
+                    <h3 style="margin-top:1.5rem">📜 Meus Planos de Script</h3>
+                    <div class="plans-list-wrapper">
+                        <table class="simple-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="plans-body">
+                                <tr><td colspan="3" style="text-align:center; opacity:0.5">Carregando planos...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>

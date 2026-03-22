@@ -366,3 +366,46 @@ td { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-al
     .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
     .header-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 }
+
+/* Plan Management Styles */
+.plans-list-wrapper {
+    margin-top: 1rem;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: rgba(0,0,0,0.1);
+}
+.simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.simple-table th {
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.05);
+    text-align: left;
+    color: var(--text-muted);
+}
+.simple-table td {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.btn-sm {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: var(--transition);
+}
+.btn-sm.activate { background: var(--primary); color: white; }
+.btn-sm.delete { background: var(--danger); color: white; margin-left: 5px; }
+.plan-active-badge {
+    background: var(--success);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}

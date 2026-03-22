@@ -13,14 +13,17 @@ ARCH_KEYWORDS = [
     "decoraç", "projeto", "interiores", "ateliê", "studio arq"
 ]
 
-def _is_professional(user) -> bool:
+def _is_professional(user, custom_keywords: list[str] = None) -> bool:
     """Heurística para filtrar perfis profissionais."""
     bio = (user.biography or "").lower()
     full_name = (user.full_name or "").lower()
-    has_keyword = any(k in bio or k in full_name for k in ARCH_KEYWORDS)
+    
+    keywords = custom_keywords if custom_keywords else ARCH_KEYWORDS
+    has_keyword = any(k.strip().lower() in bio or k.strip().lower() in full_name for k in keywords)
+    
     return has_keyword and user.follower_count >= 50 and not user.is_private
 
-def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20) -> list[dict]:
+def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
     leads = []
     try:
         medias = cl.hashtag_medias_recent(hashtag.strip("#"), amount=max_results)
@@ -30,10 +33,10 @@ def search_by_hashtag(cl: Client, hashtag: str, max_results: int = 20) -> list[d
             seen_ids.add(media.user.pk)
             try:
                 user = cl.user_info(media.user.pk)
-                if _is_professional(user):
+                if _is_professional(user, keywords):
                     leads.append(_format_user(user))
                 import time
-                time.sleep(random.uniform(1.5, 3))
+                time.sleep(random.uniform(1, 2))
             except: continue
     except Exception as e:
         logger.error(f"Erro hashtag #{hashtag}: {e}")
@@ -49,31 +52,30 @@ def search_by_username(cl: Client, username: str) -> dict | None:
         logger.error(f"Erro busca perfil @{username}: {e}")
         return None
 
-def search_similar_accounts(cl: Client, username: str, max_results: int = 20) -> list[dict]:
+def search_similar_accounts(cl: Client, username: str, max_results: int = 20, keywords: list[str] = None) -> list[dict]:
     """Busca perfis semelhantes a um usuário de sucesso."""
     leads = []
     try:
         user_id = cl.user_id_from_username(username.strip("@"))
         similar_users = cl.user_similar_accounts(user_id)
         for user in similar_users[:max_results]:
-            # user aqui pode vir com menos info, recarregar completo se necessário
             try:
                 full_user = cl.user_info(user.pk)
-                if _is_professional(full_user):
+                if _is_professional(full_user, keywords):
                     leads.append(_format_user(full_user))
                 import time
-                time.sleep(random.uniform(1, 2))
+                time.sleep(random.uniform(0.5, 1.5))
             except: continue
     except Exception as e:
         logger.error(f"Erro perfis similares a @{username}: {e}")
     return leads
 
-def search_by_multiple_hashtags(cl: Client, hashtags: list[str], max_per_hashtag: int = 10) -> list[dict]:
+def search_by_multiple_hashtags(cl: Client, hashtags: list[str], max_per_hashtag: int = 10, keywords: list[str] = None) -> list[dict]:
     """Busca leads em múltiplas hashtags, removendo duplicatas."""
     all_leads = []
     seen_ids = set()
     for hashtag in hashtags:
-        results = search_by_hashtag(cl, hashtag, max_per_hashtag)
+        results = search_by_hashtag(cl, hashtag, max_per_hashtag, keywords)
         for lead in results:
             if lead["instagram_id"] not in seen_ids:
                 seen_ids.add(lead["instagram_id"])
