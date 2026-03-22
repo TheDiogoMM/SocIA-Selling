@@ -6,7 +6,7 @@ import asyncio
 import os
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired, TwoFactorRequired
-from database import save_session, load_session
+from database import save_session, load_session, delete_session
 
 logger = logging.getLogger(__name__)
 
@@ -14,25 +14,49 @@ logger = logging.getLogger(__name__)
 _clients: dict[str, Client] = {}
 _logged_in_users: set[str] = set()
 
+async def verify_session(cl: Client) -> bool:
+    """Verifica se a sessão do cliente ainda é válida usando uma chamada privada real."""
+    try:
+        loop = asyncio.get_event_loop()
+        # account_info() é uma chamada privada que falha rápido se a sessão estiver morta
+        await loop.run_in_executor(None, lambda: cl.account_info())
+        return True
+    except Exception as e:
+        logger.warning(f"Sessão invalidada na verificação: {e}")
+        return False
+
 async def get_or_restore_client(username: str) -> Client | None:
-    """Retorna o cliente da memória ou tenta restaurar do banco com verificação."""
+    """Retorna o cliente da memória ou tenta restaurar do banco com verificação RIGOROSA."""
     global _clients, _logged_in_users
     
+    # 1. Tenta cliente em memória
     if username in _clients:
         cl = _clients[username]
-        try:
-            # Verifica se ainda está válido (leve)
-            loop = asyncio.get_event_loop()
-            await asyncio.wait_for(loop.run_in_executor(None, lambda: cl.user_id_from_username(username)), timeout=4.0)
+        if await verify_session(cl):
             return cl
-        except:
-            logger.warning(f"Sessão em memória de @{username} parece inválida. Tentando restaurar...")
+        else:
+            logger.warning(f"Sessão em memória de @{username} expirou. Removendo...")
             logout(username)
     
-    # Tenta restaurar do banco
-    res = await try_login(username)
-    if res.get("ok"):
-        return _clients.get(username)
+    # 2. Tenta restaurar do banco
+    session_data = await load_session(username)
+    if session_data:
+        cl = Client()
+        if os.path.exists('/tmp'): cl.settings_path = '/tmp/instagrapi_settings'
+        
+        try:
+            cl.set_settings(session_data)
+            if await verify_session(cl):
+                logger.info(f"Sessão de @{username} restaurada e VERIFICADA com sucesso.")
+                _clients[username] = cl
+                _logged_in_users.add(username)
+                return cl
+            else:
+                logger.error(f"Sessão no banco para @{username} está MORTA. Deletando do banco.")
+                await delete_session(username)
+        except Exception as e:
+            logger.error(f"Erro ao tentar restaurar sessão de @{username}: {e}")
+            await delete_session(username)
     
     return None
 
@@ -122,6 +146,6 @@ def logout(username: str):
             _clients[username].logout()
         except:
             pass
-        del _clients[username]
+        _clients.pop(username, None)
     if username in _logged_in_users:
-        _logged_in_users.remove(username)
+        _logged_in_users.discard(username)

@@ -80,6 +80,12 @@ async function apiCall(endpoint, method = 'GET', body = null) {
         const res = await fetch(`/api/${endpoint}`, opts);
         
         if (!res.ok) {
+            if (res.status === 401) {
+                console.warn("Sessão expirada ou Login necessário.");
+                document.getElementById('login-overlay').classList.remove('hidden');
+                showToast("Sessão expirada. Por favor, conecte novamente.", "danger");
+                return null;
+            }
             const errorText = await res.text();
             let errorData;
             try { errorData = JSON.parse(errorText); } catch(e) {}

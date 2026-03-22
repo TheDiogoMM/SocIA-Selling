@@ -99,6 +99,10 @@ async def load_session(profile: str) -> dict | None:
         res = await client.table("sessions").select("session_data").eq("profile_username", profile).execute()
         return res.data[0]["session_data"] if res.data else None
 
+async def delete_session(profile: str):
+    async with get_client() as client:
+        await client.table("sessions").delete().eq("profile_username", profile).execute()
+
 # --- Leads ---
 
 async def upsert_lead(data: dict, owner: str) -> str:
